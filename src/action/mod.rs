@@ -14,7 +14,8 @@ pub use self::update_document::UpdateDocument;
 
 pub mod query_keys {
 
-    use {Error, Revision, serde, transport};
+    use crate::{Error, Revision, transport};
+    use {serde};
 
     macro_rules! define_query_key {
         ($key_name:ident, $key_str:expr) => {
@@ -68,7 +69,6 @@ pub mod query_keys {
     {
         type Value = String;
         fn as_query_value_fallible(&self) -> Result<Self::Value, Error> {
-            use serde_json;
             serde_json::to_string(self).map_err(|e| Error::JsonEncode { cause: e })
         }
     }
@@ -106,7 +106,6 @@ pub mod query_keys {
     {
         type Value = String;
         fn as_query_value_fallible(&self) -> Result<Self::Value, Error> {
-            use serde_json;
             serde_json::to_string(self).map_err(|e| Error::JsonEncode { cause: e })
         }
     }

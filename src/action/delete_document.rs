@@ -1,7 +1,7 @@
-use {Error, IntoDocumentPath, Revision, std};
-use action::query_keys::*;
-use document::WriteDocumentResponse;
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::{Error, IntoDocumentPath, Revision};
+use crate::action::query_keys::*;
+use crate::document::WriteDocumentResponse;
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
 
 pub struct DeleteDocument<'a, T: Transport + 'a, P: IntoDocumentPath> {
     transport: &'a T,
@@ -24,17 +24,15 @@ impl<'a, P: IntoDocumentPath, T: Transport + 'a> DeleteDocument<'a, T, P> {
 
     pub fn run(mut self) -> Result<Revision, Error> {
         self.transport.send(
-            try!(self.make_request()),
+            self.make_request()?,
             JsonResponseDecoder::new(handle_response),
         )
     }
 
     fn make_request(&mut self) -> Result<Request, Error> {
-        let doc_path = try!(
-            std::mem::replace(&mut self.doc_path, None)
-                .unwrap()
-                .into_document_path()
-        );
+        let doc_path = std::mem::replace(&mut self.doc_path, None)
+            .unwrap()
+            .into_document_path()?;
         Ok(
             self.transport
                 .delete(doc_path.iter())
@@ -47,7 +45,7 @@ impl<'a, P: IntoDocumentPath, T: Transport + 'a> DeleteDocument<'a, T, P> {
 fn handle_response(response: JsonResponse) -> Result<Revision, Error> {
     match response.status_code() {
         StatusCode::Ok => {
-            let body: WriteDocumentResponse = try!(response.decode_content());
+            let body: WriteDocumentResponse = response.decode_content()?;
             Ok(body.revision)
         }
         StatusCode::Conflict => Err(Error::document_conflict(&response)),
@@ -62,7 +60,7 @@ mod tests {
 
     use super::*;
     use {Error, Revision};
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
 
     #[test]
     fn make_request_default() {

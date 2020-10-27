@@ -1,7 +1,7 @@
-use {Document, Error, Revision};
-use action::query_keys::*;
-use document::WriteDocumentResponse;
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::{Document, Error, Revision};
+use crate::action::query_keys::*;
+use crate::document::WriteDocumentResponse;
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
 
 pub struct UpdateDocument<'a, T>
 where
@@ -25,7 +25,7 @@ where
 
     pub fn run(mut self) -> Result<Revision, Error> {
         self.transport.send(
-            try!(self.make_request()),
+            self.make_request()?,
             JsonResponseDecoder::new(handle_response),
         )
     }
@@ -42,7 +42,7 @@ where
 fn handle_response(response: JsonResponse) -> Result<Revision, Error> {
     match response.status_code() {
         StatusCode::Created => {
-            let body: WriteDocumentResponse = try!(response.decode_content());
+            let body: WriteDocumentResponse = response.decode_content()?;
             Ok(body.revision)
         }
         StatusCode::Conflict => Err(Error::document_conflict(&response)),
@@ -57,8 +57,8 @@ mod tests {
 
     use super::*;
     use {Error, Revision, serde_json};
-    use document::DocumentBuilder;
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::document::DocumentBuilder;
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
 
     #[test]
     fn make_request_default() {

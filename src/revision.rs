@@ -1,4 +1,4 @@
-use Error;
+use crate::error::Error;
 use serde;
 use std;
 use uuid;
@@ -49,17 +49,17 @@ impl std::str::FromStr for Revision {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
 
-        use error::RevisionParseErrorKind;
+        use crate::error::RevisionParseErrorKind;
 
         let mut parts = s.splitn(2, '-');
 
-        let sequence_number_str = try!(parts.next().ok_or(Error::RevisionParse {
+        let sequence_number_str = parts.next().ok_or(Error::RevisionParse {
             kind: RevisionParseErrorKind::TooFewParts,
-        }));
+        })?;
 
-        let sequence_number = match try!(u64::from_str_radix(sequence_number_str, 10).map_err(|e| {
+        let sequence_number = match u64::from_str_radix(sequence_number_str, 10).map_err(|e| {
             Error::RevisionParse { kind: RevisionParseErrorKind::NumberParse(e) }
-        })) {
+        })? {
             0 => {
                 return Err(Error::RevisionParse {
                     kind: RevisionParseErrorKind::ZeroSequenceNumber,
@@ -68,13 +68,13 @@ impl std::str::FromStr for Revision {
             x @ _ => x,
         };
 
-        let digest_str = try!(parts.next().ok_or(Error::RevisionParse {
+        let digest_str = parts.next().ok_or(Error::RevisionParse {
             kind: RevisionParseErrorKind::TooFewParts,
-        }));
+        })?;
 
-        let digest = try!(uuid::Uuid::parse_str(digest_str).map_err(|e| {
+        let digest = uuid::Uuid::parse_str(digest_str).map_err(|e| {
             Error::RevisionParse { kind: RevisionParseErrorKind::DigestParse(e) }
-        }));
+        })?;
 
         if digest_str.chars().any(|c| !c.is_digit(16)) {
             return Err(Error::RevisionParse {
@@ -119,8 +119,7 @@ impl serde::Deserialize for Revision {
             where
                 E: serde::de::Error,
             {
-                use std::error::Error;
-                Revision::parse(v).map_err(|e| E::invalid_value(e.description()))
+                Revision::parse(v).map_err(|e| E::invalid_value(&e.to_string()))
             }
         }
 
@@ -132,7 +131,7 @@ impl serde::Deserialize for Revision {
 mod tests {
 
     use super::Revision;
-    use Error;
+    use crate::Error;
     use serde_json;
 
     #[test]

@@ -1,4 +1,5 @@
-use {ViewName, serde, std};
+use {serde, std};
+use super::ViewName;
 
 /// Container for a _map_ and optional _reduce_ function of a view.
 ///
@@ -109,12 +110,12 @@ impl serde::Deserialize for ViewFunction {
                 let mut reduce = None;
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Map) => {
-                            map = Some(try!(visitor.visit_value()));
+                            map = Some(visitor.visit_value()?);
                         }
                         Some(Field::Reduce) => {
-                            reduce = Some(try!(visitor.visit_value()));
+                            reduce = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -122,11 +123,11 @@ impl serde::Deserialize for ViewFunction {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let map = match map {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("map")),
+                    None => visitor.missing_field("map")?,
                 };
 
                 Ok(ViewFunction {
@@ -148,18 +149,18 @@ impl serde::Serialize for ViewFunction {
         S: serde::Serializer,
     {
         let len = if self.reduce.is_some() { 2 } else { 1 };
-        let mut state = try!(serializer.serialize_struct("ViewFunction", len));
-        try!(serializer.serialize_struct_elt(
+        let mut state = serializer.serialize_struct("ViewFunction", len)?;
+        serializer.serialize_struct_elt(
             &mut state,
             "map",
             &self.map,
-        ));
+        )?;
         if let Some(ref reduce) = self.reduce {
-            try!(serializer.serialize_struct_elt(
+            serializer.serialize_struct_elt(
                 &mut state,
                 "reduce",
                 reduce,
-            ));
+            )?;
         }
         serializer.serialize_struct_end(state)
     }
@@ -230,9 +231,9 @@ impl serde::Deserialize for Design {
                 let mut views = None;
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Views) => {
-                            views = Some(try!(visitor.visit_value()));
+                            views = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -240,7 +241,7 @@ impl serde::Deserialize for Design {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let views = match views {
                     Some(x) => x,
@@ -264,12 +265,12 @@ impl serde::Serialize for Design {
     where
         S: serde::Serializer,
     {
-        let mut state = try!(serializer.serialize_struct("Design", 1));
-        try!(serializer.serialize_struct_elt(
+        let mut state = serializer.serialize_struct("Design", 1)?;
+        serializer.serialize_struct_elt(
             &mut state,
             "views",
             &self.views,
-        ));
+        )?;
         serializer.serialize_struct_end(state)
     }
 }

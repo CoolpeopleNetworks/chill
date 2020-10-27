@@ -1,6 +1,7 @@
 
 use super::{AsyncActionHandler, JsonResponse, Request, ResponseHandler, ResponseHeaders, StatusCode, Transport};
-use {Error, url};
+use {url};
+use super::Error;
 
 pub struct JsonResponseBuilder {
     inner: JsonResponse,

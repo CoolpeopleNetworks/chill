@@ -1,4 +1,4 @@
-use Error;
+use crate::Error;
 use regex;
 use std;
 use tempdir;
@@ -36,29 +36,33 @@ impl FakeServer {
     /// Spawns a CouchDB server process.
     pub fn new() -> Result<FakeServer, Error> {
 
-        let tmp_root = try!(tempdir::TempDir::new("chill_test").map_err(|e| {
+        let tmp_root = tempdir::TempDir::new("chill_test").map_err(|e| {
             Error::Io {
                 cause: e,
                 description: "Failed to create temporary directory for CouchDB server",
             }
-        }));
+        })?;
+
+        println!("Temp directory: {:?}", tmp_root.path().as_os_str().to_str());
 
         {
             use std::io::Write;
             let path = tmp_root.path().join("couchdb.conf");
-            let mut f = try!(std::fs::File::create(&path).map_err(|e| {
+            let mut f = std::fs::File::create(&path).map_err(|e| {
                 Error::Io {
                     cause: e,
                     description: "Failed to open CouchDB server configuration file",
                 }
-            }));
-            try!(
-                f.write_all(
-                    b"[couchdb]\n\
+            })?;
+
+            f.write_all(
+                b"[couchdb]\n\
                 database_dir = var\n\
                 uri_file = couchdb.uri\n\
                 view_index_dir = view\n\
                 \n\
+                [admins]\n\
+                admin=foo\n\
                 [log]\n\
                 file = couchdb.log\n\
                 \n\
@@ -70,16 +74,15 @@ impl FakeServer {
                             cause: e,
                             description: "Failed to write CouchDB server configuration file",
                         }
-                    })
-            );
+                    })?;
         }
 
-        let child = try!(new_test_server_command(&tmp_root).spawn().map_err(|e| {
+        let child = new_test_server_command(&tmp_root).spawn().map_err(|e| {
             Error::Io {
                 cause: e,
                 description: "Failed to spawn CouchDB server process",
             }
-        }));
+        })?;
         let mut process = AutoKillProcess(child);
 
         let (tx, rx) = std::sync::mpsc::channel();
@@ -99,7 +102,7 @@ impl FakeServer {
                 use std::io::BufRead;
                 line.clear();
                 process_out.read_line(&mut line).unwrap();
-                let line = line.trim_right();
+                let line = line.trim_end();
                 match re.captures(line) {
                     None => (),
                     Some(caps) => {
@@ -121,13 +124,13 @@ impl FakeServer {
         });
 
         // Wait for the CouchDB server to start its HTTP service.
-        let uri = try!(rx.recv().map_err(|e| {
+        let uri = rx.recv().map_err(|e| {
             t.join().unwrap_err();
             Error::ChannelReceive {
                 cause: e,
                 description: "Failed to extract URI from CouchDB server",
             }
-        }));
+        })?;
 
         Ok(FakeServer {
             _process: process,

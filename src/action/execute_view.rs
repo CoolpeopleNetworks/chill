@@ -1,9 +1,10 @@
 //! Defines an action for executing a view.
 
-use {DatabaseName, Error, IntoViewPath, ViewResponse, serde, std};
-use action::query_keys::*;
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
-use view::ViewResponseJsonable;
+use crate::{DatabaseName, Error, IntoViewPath, ViewResponse};
+use {serde};
+use crate::action::query_keys::*;
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::view::ViewResponseJsonable;
 
 enum Inclusivity {
     Exclusive,
@@ -294,7 +295,7 @@ where
     T: Transport,
 {
     pub fn run(mut self) -> Result<ViewResponse, Error> {
-        let (request, db_name) = try!(self.make_request());
+        let (request, db_name) = self.make_request()?;
         self.transport.send(
             request,
             JsonResponseDecoder::new(move |response| handle_response(response, db_name)),
@@ -303,11 +304,9 @@ where
 
     fn make_request(&mut self) -> Result<(Request, DatabaseName), Error> {
 
-        let view_path = try!(
-            std::mem::replace(&mut self.view_path, None)
-                .unwrap()
-                .into_view_path()
-        );
+        let view_path = std::mem::replace(&mut self.view_path, None)
+            .unwrap()
+            .into_view_path()?;
         let db_name = view_path.database_name().clone();
 
         let request = self.transport.get(view_path.iter()).with_accept_json();
@@ -319,14 +318,14 @@ where
 
         let request = match self.start_key {
             None => request,
-            Some(ref key) => try!(request.with_query_fallible(StartKeyQueryKey, key)),
+            Some(ref key) => request.with_query_fallible(StartKeyQueryKey, key)?,
         };
 
         let request = match self.end_key {
             None => request,
-            Some((ref key, Inclusivity::Inclusive)) => try!(request.with_query_fallible(EndKeyQueryKey, key)),
+            Some((ref key, Inclusivity::Inclusive)) => request.with_query_fallible(EndKeyQueryKey, key)?,
             Some((ref key, Inclusivity::Exclusive)) => {
-                try!(request.with_query_fallible(EndKeyQueryKey, key)).with_query(InclusiveEndQueryKey, &false)
+                request.with_query_fallible(EndKeyQueryKey, key)?.with_query(InclusiveEndQueryKey, &false)
             }
         };
 
@@ -358,7 +357,7 @@ where
 fn handle_response(response: JsonResponse, db_name: DatabaseName) -> Result<ViewResponse, Error> {
     match response.status_code() {
         StatusCode::Ok => {
-            let body: ViewResponseJsonable = try!(response.decode_content());
+            let body: ViewResponseJsonable = response.decode_content()?;
             Ok(ViewResponse::new_from_decoded(db_name, body))
         }
         StatusCode::NotFound => Err(Error::not_found(&response)),
@@ -372,8 +371,8 @@ mod tests {
 
     use super::*;
     use {DatabaseName, Error};
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
-    use view::ViewResponseBuilder;
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::view::ViewResponseBuilder;
 
     #[test]
     fn make_request_default() {

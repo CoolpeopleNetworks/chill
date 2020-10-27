@@ -1,9 +1,9 @@
 //! Defines an action for reading a document from the CouchDB server.
 
-use {DatabaseName, Document, Error, IntoDocumentPath, Revision, std};
-use action::query_keys::*;
-use document::JsonDecodableDocument;
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::{DatabaseName, Document, Error, IntoDocumentPath, Revision};
+use crate::action::query_keys::*;
+use crate::document::JsonDecodableDocument;
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
 
 /// Reads a document from the CouchDB server and returns the result.
 ///
@@ -97,7 +97,7 @@ impl<'a, T: Transport + 'a, P: IntoDocumentPath> ReadDocument<'a, T, P> {
 
     /// Executes the action and waits for the result.
     pub fn run(mut self) -> Result<Document, Error> {
-        let (request, db_name) = try!(self.make_request());
+        let (request, db_name) = self.make_request()?;
         self.transport.send(
             request,
             JsonResponseDecoder::new(move |response| handle_response(response, db_name)),
@@ -105,11 +105,9 @@ impl<'a, T: Transport + 'a, P: IntoDocumentPath> ReadDocument<'a, T, P> {
     }
 
     fn make_request(&mut self) -> Result<(Request, DatabaseName), Error> {
-        let doc_path = try!(
-            std::mem::replace(&mut self.doc_path, None)
-                .unwrap()
-                .into_document_path()
-        );
+        let doc_path = std::mem::replace(&mut self.doc_path, None)
+            .unwrap()
+            .into_document_path()?;
         let db_name = doc_path.database_name().clone();
         let request = self.transport.get(doc_path.iter()).with_accept_json();
 
@@ -131,7 +129,7 @@ impl<'a, T: Transport + 'a, P: IntoDocumentPath> ReadDocument<'a, T, P> {
 fn handle_response(response: JsonResponse, db_name: DatabaseName) -> Result<Document, Error> {
     match response.status_code() {
         StatusCode::Ok => {
-            let decoded_doc: JsonDecodableDocument = try!(response.decode_content());
+            let decoded_doc: JsonDecodableDocument = response.decode_content()?;
             Ok(Document::new_from_decoded(db_name, decoded_doc))
         }
         StatusCode::NotFound => Err(Error::not_found(&response)),
@@ -161,8 +159,8 @@ mod tests {
 
     use super::*;
     use {DatabaseName, Error, Revision};
-    use document::DocumentBuilder;
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::document::DocumentBuilder;
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
 
     #[test]
     fn make_request_default() {

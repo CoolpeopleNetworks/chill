@@ -1,5 +1,6 @@
-use {DatabaseName, Document, DocumentId, DocumentPath, Error, serde, serde_json, std};
-use document::JsonDecodableDocument;
+use crate::{DatabaseName, Document, DocumentId, DocumentPath, Error};
+use {serde, serde_json, std};
+use crate::document::JsonDecodableDocument;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ViewResponse {
@@ -108,9 +109,9 @@ impl ViewRow {
             None => None,
             Some(ref key) => {
                 // TODO: Optimize this to eliminate cloning and re-decoding.
-                try!(serde_json::from_value(key.clone()).map_err(|e| {
+                serde_json::from_value(key.clone()).map_err(|e| {
                     Error::JsonDecode { cause: e }
-                }))
+                })?
             }
         };
 
@@ -196,18 +197,18 @@ impl serde::Deserialize for ViewResponseJsonable {
                 let mut update_seq = None;
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Offset) => {
-                            offset = Some(try!(visitor.visit_value()));
+                            offset = Some(visitor.visit_value()?);
                         }
                         Some(Field::Rows) => {
-                            rows = Some(try!(visitor.visit_value()));
+                            rows = Some(visitor.visit_value()?);
                         }
                         Some(Field::TotalRows) => {
-                            total_rows = Some(try!(visitor.visit_value()));
+                            total_rows = Some(visitor.visit_value()?);
                         }
                         Some(Field::UpdateSeq) => {
-                            update_seq = Some(try!(visitor.visit_value()));
+                            update_seq = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -215,11 +216,11 @@ impl serde::Deserialize for ViewResponseJsonable {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let rows = match rows {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("rows")),
+                    None => visitor.missing_field("rows")?,
                 };
 
                 Ok(ViewResponseJsonable {
@@ -296,18 +297,18 @@ impl serde::Deserialize for ViewRowJsonable {
                 let mut value = None;
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Doc) => {
-                            doc = Some(try!(visitor.visit_value()));
+                            doc = Some(visitor.visit_value()?);
                         }
                         Some(Field::Id) => {
-                            id = Some(try!(visitor.visit_value()));
+                            id = Some(visitor.visit_value()?);
                         }
                         Some(Field::Key) => {
-                            key = try!(visitor.visit_value()); // allow null
+                            key = visitor.visit_value()?; // allow null
                         }
                         Some(Field::Value) => {
-                            value = Some(try!(visitor.visit_value()));
+                            value = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -315,11 +316,11 @@ impl serde::Deserialize for ViewRowJsonable {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let value = match value {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("value")),
+                    None => visitor.missing_field("value")?,
                 };
 
                 Ok(ViewRowJsonable {
@@ -479,8 +480,8 @@ mod tests {
 
     use super::*;
     use super::ViewRowJsonable;
-    use {DocumentId, Error, IntoDocumentPath, Revision, serde_json, std};
-    use document::JsonDecodableDocument;
+    use crate::{DocumentId, Error, IntoDocumentPath, Revision, serde_json};
+    use crate::document::JsonDecodableDocument;
 
     #[test]
     fn view_row_key_ok_none() {

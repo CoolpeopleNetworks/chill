@@ -1,6 +1,7 @@
-use {DocumentId, DocumentPath, Error, IntoDatabasePath, Revision, serde, std};
-use document::WriteDocumentResponse;
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::{DocumentId, DocumentPath, Error, IntoDatabasePath, Revision};
+use {serde};
+use crate::document::WriteDocumentResponse;
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
 
 pub struct CreateDocument<'a, T, P, C>
 where
@@ -40,28 +41,24 @@ where
 
     pub fn run(mut self) -> Result<(DocumentId, Revision), Error> {
         self.transport.send(
-            try!(self.make_request()),
+            self.make_request()?,
             JsonResponseDecoder::new(handle_response),
         )
     }
 
     fn make_request(&mut self) -> Result<Request, Error> {
-        let db_path = try!(
-            std::mem::replace(&mut self.db_path, None)
-                .unwrap()
-                .into_database_path()
-        );
+        let db_path = std::mem::replace(&mut self.db_path, None)
+            .unwrap()
+            .into_database_path()?;
 
-        let request = try!(
-            match self.doc_id {
+        let request = match self.doc_id {
                 None => self.transport.post(db_path.iter()),
                 Some(ref doc_id) => {
                     let doc_path = DocumentPath::from((db_path, doc_id.clone()));
                     self.transport.put(doc_path.iter())
                 }
             }.with_accept_json()
-                .with_json_content(self.content)
-        );
+                .with_json_content(self.content)?;
 
         Ok(request)
     }
@@ -70,7 +67,7 @@ where
 fn handle_response(response: JsonResponse) -> Result<(DocumentId, Revision), Error> {
     match response.status_code() {
         StatusCode::Created => {
-            let content: WriteDocumentResponse = try!(response.decode_content());
+            let content: WriteDocumentResponse = response.decode_content()?;
             Ok((content.doc_id, content.revision))
         }
 
@@ -85,7 +82,7 @@ mod tests {
 
     use super::*;
     use {DocumentId, Error, Revision, serde_json};
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
 
     #[test]
     fn make_request_default() {

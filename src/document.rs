@@ -1,7 +1,6 @@
-use {Attachment, AttachmentName, AttachmentPath, DatabaseName, DocumentId, DocumentPath, Error, Revision};
+use super::{Attachment, AttachmentName, AttachmentPath, DatabaseName, DocumentId, DocumentPath, Error, Revision};
 use {mime, serde, serde_json, std};
-use IntoDocumentPath;
-use attachment::AttachmentBuilder;
+use super::IntoDocumentPath;
 
 /// Contains a specific version of a document.
 ///
@@ -94,7 +93,7 @@ impl Document {
         let att_name = att_name.into();
         self.attachments.insert(
             att_name,
-            AttachmentBuilder::new_unsaved(content_type, content).unwrap(),
+            super::attachment::AttachmentBuilder::new_unsaved(content_type, content).unwrap(),
         );
     }
 
@@ -181,7 +180,7 @@ mod document_tests {
     use super::*;
     use {AttachmentName, Error, IntoDocumentPath, Revision};
     use {base64, serde_json, std};
-    use attachment::AttachmentBuilder;
+    use crate::attachment::AttachmentBuilder;
 
     #[test]
     fn get_content_ok() {
@@ -602,22 +601,22 @@ impl serde::Deserialize for JsonDecodableDocument {
                 let mut content_builder = serde_json::builder::ObjectBuilder::new();
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Attachments) => {
-                            attachments = Some(try!(visitor.visit_value()));
+                            attachments = Some(visitor.visit_value()?);
                         }
                         Some(Field::Content(name)) => {
-                            let value = Some(try!(visitor.visit_value::<serde_json::Value>()));
+                            let value = Some(visitor.visit_value::<serde_json::Value>()?);
                             content_builder = content_builder.insert(name, value);
                         }
                         Some(Field::Deleted) => {
-                            deleted = Some(try!(visitor.visit_value()));
+                            deleted = Some(visitor.visit_value()?);
                         }
                         Some(Field::Id) => {
-                            id = Some(try!(visitor.visit_value()));
+                            id = Some(visitor.visit_value()?);
                         }
                         Some(Field::Rev) => {
-                            revision = Some(try!(visitor.visit_value()));
+                            revision = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -625,16 +624,16 @@ impl serde::Deserialize for JsonDecodableDocument {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 Ok(JsonDecodableDocument {
                     doc_id: match id {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("_id")),
+                        None => visitor.missing_field("_id")?,
                     },
                     revision: match revision {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("_rev")),
+                        None => visitor.missing_field("_rev")?,
                     },
                     deleted: deleted.unwrap_or(false),
                     attachments: attachments.unwrap_or(std::collections::HashMap::new()),
@@ -706,15 +705,15 @@ impl serde::Deserialize for WriteDocumentResponse {
                 let mut ok = None;
                 let mut rev = None;
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Id) => {
-                            id = Some(try!(visitor.visit_value()));
+                            id = Some(visitor.visit_value()?);
                         }
                         Some(Field::Ok) => {
-                            ok = Some(try!(visitor.visit_value()));
+                            ok = Some(visitor.visit_value()?);
                         }
                         Some(Field::Rev) => {
-                            rev = Some(try!(visitor.visit_value()));
+                            rev = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -722,20 +721,20 @@ impl serde::Deserialize for WriteDocumentResponse {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 Ok(WriteDocumentResponse {
                     doc_id: match id {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("id")),
+                        None => visitor.missing_field("id")?,
                     },
                     ok: match ok {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("ok")),
+                        None => visitor.missing_field("ok")?,
                     },
                     revision: match rev {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("rev")),
+                        None => visitor.missing_field("rev")?,
                     },
                 })
             }
@@ -787,7 +786,7 @@ mod tests {
     use super::*;
     use AttachmentName;
     use DocumentId;
-    use attachment::AttachmentBuilder;
+    use crate::attachment::AttachmentBuilder;
     use serde_json;
     use std;
 

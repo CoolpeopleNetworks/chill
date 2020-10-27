@@ -1,5 +1,5 @@
 use {hyper, mime, serde, serde_json, std, url, uuid};
-use transport::{JsonResponse, StatusCode};
+use super::transport::{JsonResponse, StatusCode};
 
 /// Contains information for an error originating from or propagated by Chill.
 #[derive(Debug)]
@@ -144,7 +144,7 @@ impl std::error::Error for Error {
         }
     }
 
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         use Error::*;
         match self {
             &ChannelReceive { ref cause, .. } => Some(cause),
@@ -172,7 +172,7 @@ impl std::error::Error for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         use Error::*;
-        let description = std::error::Error::description(self);
+        let description = self.to_string();
         match self {
             &ChannelReceive {
                 ref cause,
@@ -197,13 +197,13 @@ impl std::fmt::Display for Error {
                 ref status_code,
                 ref error_response,
             } => {
-                try!(write!(f, "{} ({}", description, status_code));
-                try!(match status_code.canonical_reason() {
+                write!(f, "{} ({}", description, status_code)?;
+                match status_code.canonical_reason() {
                     None => write!(f, ")"),
                     Some(reason) => write!(f, ": {})", reason),
-                });
+                }?;
                 if let &Some(ref error_response) = error_response {
-                    try!(write!(f, ": {}", error_response));
+                    write!(f, ": {}", error_response)?;
                 }
                 Ok(())
             }
@@ -227,7 +227,7 @@ pub enum PathParseErrorKind {
 }
 
 impl PathParseErrorKind {
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         None
     }
 }
@@ -256,7 +256,7 @@ pub enum RevisionParseErrorKind {
 }
 
 impl RevisionParseErrorKind {
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         use self::RevisionParseErrorKind::*;
         match self {
             &DigestNotAllHex => None,
@@ -292,7 +292,7 @@ pub enum TransportErrorKind {
 }
 
 impl TransportErrorKind {
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         use self::TransportErrorKind::*;
         match self {
             &Hyper(ref cause) => Some(cause),
@@ -397,12 +397,12 @@ impl serde::Deserialize for ErrorResponse {
                 let mut error = None;
                 let mut reason = None;
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::Error) => {
-                            error = Some(try!(visitor.visit_value()));
+                            error = Some(visitor.visit_value()?);
                         }
                         Some(Field::Reason) => {
-                            reason = Some(try!(visitor.visit_value()));
+                            reason = Some(visitor.visit_value()?);
                         }
                         None => {
                             break;
@@ -410,16 +410,16 @@ impl serde::Deserialize for ErrorResponse {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let x = ErrorResponse {
                     error: match error {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("error")),
+                        None => visitor.missing_field("error")?,
                     },
                     reason: match reason {
                         Some(x) => x,
-                        None => try!(visitor.missing_field("reason")),
+                        None => visitor.missing_field("reason")?,
                     },
                 };
 

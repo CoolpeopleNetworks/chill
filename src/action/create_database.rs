@@ -1,5 +1,5 @@
-use {Error, IntoDatabasePath, std};
-use transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
+use crate::{Error, IntoDatabasePath};
+use crate::transport::{JsonResponse, JsonResponseDecoder, Request, StatusCode, Transport};
 
 pub struct CreateDatabase<'a, T: Transport + 'a, P: IntoDatabasePath> {
     transport: &'a T,
@@ -17,17 +17,15 @@ impl<'a, P: IntoDatabasePath, T: Transport + 'a> CreateDatabase<'a, T, P> {
 
     pub fn run(mut self) -> Result<(), Error> {
         self.transport.send(
-            try!(self.make_request()),
+            self.make_request()?,
             JsonResponseDecoder::new(handle_response),
         )
     }
 
     fn make_request(&mut self) -> Result<Request, Error> {
-        let db_path = try!(
-            std::mem::replace(&mut self.db_path, None)
-                .unwrap()
-                .into_database_path()
-        );
+        let db_path = std::mem::replace(&mut self.db_path, None)
+            .unwrap()
+            .into_database_path()?;
         Ok(self.transport.put(db_path.iter()).with_accept_json())
     }
 }
@@ -46,7 +44,7 @@ mod tests {
 
     use super::*;
     use Error;
-    use transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
+    use crate::transport::{JsonResponseBuilder, MockTransport, StatusCode, Transport};
 
     #[test]
     fn make_request_default() {

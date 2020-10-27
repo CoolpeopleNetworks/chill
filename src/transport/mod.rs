@@ -4,8 +4,9 @@ mod testing;
 
 #[cfg(test)]
 pub use self::testing::{JsonResponseBuilder, MockTransport};
-use {Error, hyper, serde, serde_json, std, url};
-use error::TransportErrorKind;
+use super::{Error, url};
+use {hyper, serde, serde_json, std};
+use super::error::TransportErrorKind;
 pub use hyper::method::Method;
 pub use hyper::status::StatusCode;
 use std::io::prelude::*;
@@ -53,9 +54,9 @@ impl Request {
         self.headers.set(hyper::header::ContentType(
             mime!(Application / Json),
         ));
-        self.body = try!(serde_json::to_vec(content).map_err(|e| {
+        self.body = serde_json::to_vec(content).map_err(|e| {
             Error::JsonEncode { cause: e }
-        }));
+        })?;
         Ok(self)
     }
 
@@ -78,7 +79,7 @@ impl Request {
     {
         self.url.query_pairs_mut().append_pair(
             key.as_query_key().as_ref(),
-            try!(value.as_query_value_fallible()).as_ref(),
+            value.as_query_value_fallible()?.as_ref(),
         );
         Ok(self)
     }
@@ -156,7 +157,7 @@ where
         mut headers: ResponseHeaders,
     ) -> Result<(), Error> {
 
-        try!(headers.extract_content_type_as_json());
+        headers.extract_content_type_as_json()?;
 
         self.status_code = status_code;
         self.headers = headers;
@@ -337,27 +338,27 @@ impl Transport for HyperTransport {
                 requester.body(&request.body[..])
             };
 
-            try!(requester.send().map_err(|e| {
+            requester.send().map_err(|e| {
                 Error::Transport { kind: TransportErrorKind::Hyper(e) }
-            }))
+            })?
         };
 
         let headers = std::mem::replace(&mut response.headers, hyper::header::Headers::new());
         let headers = ResponseHeaders::from(headers);
-        try!(response_handler.handle_response_status_and_headers(
+        response_handler.handle_response_status_and_headers(
             response.status,
             headers,
-        ));
+        )?;
 
         let mut body = Vec::new();
-        try!(response.read_to_end(&mut body).map_err(|e| {
+        response.read_to_end(&mut body).map_err(|e| {
             Error::Io {
                 cause: e,
                 description: "Failed to read response from server",
             }
-        }));
+        })?;
 
-        try!(response_handler.handle_response_content(body));
+        response_handler.handle_response_content(body)?;
         response_handler.handle_response_eof()
     }
 

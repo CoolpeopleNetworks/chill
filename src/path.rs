@@ -1,5 +1,5 @@
-use Error;
-use error::PathParseErrorKind;
+use super::error::Error;
+use crate::error::PathParseErrorKind;
 use serde;
 use std;
 
@@ -116,8 +116,8 @@ mod path_extractor_tests {
     #[test]
     fn begin() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::error::Error;
+        use crate::error::PathParseErrorKind;
         use super::PathExtractor;
 
         macro_rules! nok {
@@ -140,8 +140,8 @@ mod path_extractor_tests {
     #[test]
     fn end() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
         use super::PathExtractor;
 
         macro_rules! nok {
@@ -166,8 +166,8 @@ mod path_extractor_tests {
     #[test]
     fn extract_nonempty() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
         use super::PathExtractor;
 
         macro_rules! ok {
@@ -219,8 +219,8 @@ mod path_extractor_tests {
     #[test]
     fn extract_literal() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
         use super::PathExtractor;
 
         macro_rules! ok {
@@ -713,9 +713,9 @@ pub trait IntoDatabasePath {
 impl IntoDatabasePath for &'static str {
     fn into_database_path(self) -> Result<DatabasePath, Error> {
 
-        let mut path_extractor = try!(PathExtractor::begin(self));
-        let db_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.end());
+        let mut path_extractor = PathExtractor::begin(self)?;
+        let db_name = path_extractor.extract_nonempty()?;
+        path_extractor.end()?;
 
         Ok(DatabasePath { db_name: DatabaseName::from(db_name) })
     }
@@ -748,8 +748,8 @@ mod into_database_path_tests {
     #[test]
     fn static_str_ref_nok() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
 
         macro_rules! nok {
             ($input:expr, $expected_error_kind:pat) => {
@@ -919,23 +919,23 @@ pub trait IntoDocumentPath {
 impl IntoDocumentPath for &'static str {
     fn into_document_path(self) -> Result<DocumentPath, Error> {
 
-        let mut path_extractor = try!(PathExtractor::begin(self));
-        let db_name = try!(path_extractor.extract_nonempty());
+        let mut path_extractor = PathExtractor::begin(self)?;
+        let db_name = path_extractor.extract_nonempty()?;
 
-        let doc_id = match try!(path_extractor.extract_nonempty()) {
+        let doc_id = match path_extractor.extract_nonempty()? {
             x @ _ if x == DESIGN_PREFIX => {
                 println!("CHECK: {:?}, {:?}", path_extractor, self);
-                let doc_name = try!(path_extractor.extract_nonempty());
+                let doc_name = path_extractor.extract_nonempty()?;
                 DocumentId::Design(DesignDocumentName::from(doc_name))
             }
             x @ _ if x == LOCAL_PREFIX => {
-                let doc_name = try!(path_extractor.extract_nonempty());
+                let doc_name = path_extractor.extract_nonempty()?;
                 DocumentId::Local(LocalDocumentName::from(doc_name))
             }
             x @ _ => DocumentId::Normal(NormalDocumentName::from(x)),
         };
 
-        try!(path_extractor.end());
+        path_extractor.end()?;
 
         Ok(DocumentPath {
             db_name: db_name.into(),
@@ -957,7 +957,7 @@ where
 {
     fn into_document_path(self) -> Result<DocumentPath, Error> {
         Ok(DocumentPath {
-            db_name: try!(self.0.into_database_path()).db_name,
+            db_name: self.0.into_database_path()?.db_name,
             doc_id: self.1.into(),
         })
     }
@@ -1001,8 +1001,8 @@ mod into_document_path_tests {
     #[test]
     fn static_str_ref_nok() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
 
         macro_rules! nok {
             ($input:expr, $expected_error_kind:pat) => {
@@ -1148,11 +1148,11 @@ pub trait IntoDesignDocumentPath {
 impl IntoDesignDocumentPath for &'static str {
     fn into_design_document_path(self) -> Result<DesignDocumentPath, Error> {
 
-        let mut path_extractor = try!(PathExtractor::begin(self));
-        let db_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.extract_literal(DESIGN_PREFIX));
-        let ddoc_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.end());
+        let mut path_extractor = PathExtractor::begin(self)?;
+        let db_name = path_extractor.extract_nonempty()?;
+        path_extractor.extract_literal(DESIGN_PREFIX)?;
+        let ddoc_name = path_extractor.extract_nonempty()?;
+        path_extractor.end()?;
 
         Ok(DesignDocumentPath {
             db_name: DatabaseName::from(db_name),
@@ -1174,7 +1174,7 @@ where
 {
     fn into_design_document_path(self) -> Result<DesignDocumentPath, Error> {
         Ok(DesignDocumentPath {
-            db_name: try!(self.0.into_database_path()).db_name,
+            db_name: self.0.into_database_path()?.db_name,
             ddoc_name: self.1.into(),
         })
     }
@@ -1198,8 +1198,8 @@ mod into_design_document_path_tests {
     #[test]
     fn static_str_ref_nok() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
         use super::DESIGN_PREFIX;
 
         macro_rules! nok {
@@ -1421,24 +1421,24 @@ pub trait IntoAttachmentPath {
 impl IntoAttachmentPath for &'static str {
     fn into_attachment_path(self) -> Result<AttachmentPath, Error> {
 
-        let mut path_extractor = try!(PathExtractor::begin(self));
-        let db_name = try!(path_extractor.extract_nonempty());
+        let mut path_extractor = PathExtractor::begin(self)?;
+        let db_name = path_extractor.extract_nonempty()?;
 
-        let doc_id = match try!(path_extractor.extract_nonempty()) {
+        let doc_id = match path_extractor.extract_nonempty()? {
             x @ _ if x == DESIGN_PREFIX => {
                 println!("CHECK: {:?}, {:?}", path_extractor, self);
-                let doc_name = try!(path_extractor.extract_nonempty());
+                let doc_name = path_extractor.extract_nonempty()?;
                 DocumentId::Design(DesignDocumentName::from(doc_name))
             }
             x @ _ if x == LOCAL_PREFIX => {
-                let doc_name = try!(path_extractor.extract_nonempty());
+                let doc_name = path_extractor.extract_nonempty()?;
                 DocumentId::Local(LocalDocumentName::from(doc_name))
             }
             x @ _ => DocumentId::Normal(NormalDocumentName::from(x)),
         };
 
-        let att_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.end());
+        let att_name = path_extractor.extract_nonempty()?;
+        path_extractor.end()?;
 
         Ok(AttachmentPath {
             db_name: DatabaseName::from(db_name),
@@ -1460,7 +1460,7 @@ where
     U: Into<AttachmentName>,
 {
     fn into_attachment_path(self) -> Result<AttachmentPath, Error> {
-        let doc_path = try!(self.0.into_document_path());
+        let doc_path = self.0.into_document_path()?;
         Ok(AttachmentPath {
             db_name: doc_path.db_name,
             doc_id: doc_path.doc_id,
@@ -1477,7 +1477,7 @@ where
 {
     fn into_attachment_path(self) -> Result<AttachmentPath, Error> {
         Ok(AttachmentPath {
-            db_name: try!(self.0.into_database_path()).db_name,
+            db_name: self.0.into_database_path()?.db_name,
             doc_id: self.1.into(),
             att_name: self.2.into(),
         })
@@ -1529,8 +1529,8 @@ mod into_attachment_path_tests {
     #[test]
     fn static_str_ref_nok() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
 
         macro_rules! nok {
             ($input:expr, $expected_error_kind:pat) => {
@@ -1709,13 +1709,13 @@ pub trait IntoViewPath {
 impl IntoViewPath for &'static str {
     fn into_view_path(self) -> Result<ViewPath, Error> {
 
-        let mut path_extractor = try!(PathExtractor::begin(self));
-        let db_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.extract_literal(DESIGN_PREFIX));
-        let ddoc_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.extract_literal(VIEW_PREFIX));
-        let view_name = try!(path_extractor.extract_nonempty());
-        try!(path_extractor.end());
+        let mut path_extractor = PathExtractor::begin(self)?;
+        let db_name = path_extractor.extract_nonempty()?;
+        path_extractor.extract_literal(DESIGN_PREFIX)?;
+        let ddoc_name = path_extractor.extract_nonempty()?;
+        path_extractor.extract_literal(VIEW_PREFIX)?;
+        let view_name = path_extractor.extract_nonempty()?;
+        path_extractor.end()?;
 
         Ok(ViewPath {
             db_name: DatabaseName::from(db_name),
@@ -1737,7 +1737,7 @@ where
     U: Into<ViewName>,
 {
     fn into_view_path(self) -> Result<ViewPath, Error> {
-        let ddoc_path = try!(self.0.into_design_document_path());
+        let ddoc_path = self.0.into_design_document_path()?;
         Ok(ViewPath {
             db_name: ddoc_path.db_name,
             ddoc_name: ddoc_path.ddoc_name,
@@ -1754,7 +1754,7 @@ where
 {
     fn into_view_path(self) -> Result<ViewPath, Error> {
         Ok(ViewPath {
-            db_name: try!(self.0.into_database_path()).db_name,
+            db_name: self.0.into_database_path()?.db_name,
             ddoc_name: self.1.into(),
             view_name: self.2.into(),
         })
@@ -1782,8 +1782,8 @@ mod into_view_path_tests {
     #[test]
     fn static_str_ref_nok() {
 
-        use Error;
-        use error::PathParseErrorKind;
+        use crate::Error;
+        use crate::error::PathParseErrorKind;
         use super::{DESIGN_PREFIX, VIEW_PREFIX};
 
         macro_rules! nok {

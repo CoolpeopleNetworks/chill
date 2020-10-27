@@ -86,7 +86,7 @@ impl serde::Deserialize for Attachment {
         D: serde::Deserializer,
     {
         Ok(Attachment::Saved(
-            try!(SavedAttachment::deserialize(deserializer)),
+            SavedAttachment::deserialize(deserializer)?,
         ))
     }
 }
@@ -136,8 +136,8 @@ impl serde::Serialize for SavedAttachment {
     where
         S: serde::Serializer,
     {
-        let mut state = try!(serializer.serialize_struct("SavedAttachment", 1));
-        try!(serializer.serialize_struct_elt(&mut state, "stub", true));
+        let mut state = serializer.serialize_struct("SavedAttachment", 1)?;
+        serializer.serialize_struct_elt(&mut state, "stub", true)?;
         serializer.serialize_struct_end(state)
     }
 }
@@ -207,31 +207,31 @@ impl serde::Deserialize for SavedAttachment {
                 let mut revpos = None;
 
                 loop {
-                    match try!(visitor.visit_key()) {
+                    match visitor.visit_key()? {
                         Some(Field::ContentType) => {
-                            content_type = Some(try!(visitor.visit_value()));
+                            content_type = Some(visitor.visit_value()?);
                         }
                         Some(Field::Data) => {
-                            data = Some(try!(visitor.visit_value()));
+                            data = Some(visitor.visit_value()?);
                         }
                         Some(Field::Digest) => {
-                            digest = Some(try!(visitor.visit_value()));
+                            digest = Some(visitor.visit_value()?);
                         }
                         Some(Field::EncodedLength) => {
-                            encoded_length = Some(try!(visitor.visit_value()));
+                            encoded_length = Some(visitor.visit_value()?);
                         }
                         Some(Field::Encoding) => {
-                            encoding = Some(try!(visitor.visit_value()));
+                            encoding = Some(visitor.visit_value()?);
                         }
                         Some(Field::Length) => {
-                            length = Some(try!(visitor.visit_value()));
+                            length = Some(visitor.visit_value()?);
                         }
                         Some(Field::Revpos) => {
-                            revpos = Some(try!(visitor.visit_value()));
+                            revpos = Some(visitor.visit_value()?);
                         }
                         Some(Field::Stub) => {
                             // Ignore this field.
-                            try!(visitor.visit_value::<bool>());
+                            visitor.visit_value::<bool>()?;
                         }
                         None => {
                             break;
@@ -239,7 +239,7 @@ impl serde::Deserialize for SavedAttachment {
                     }
                 }
 
-                try!(visitor.end());
+                visitor.end()?;
 
                 let content = match (data, length) {
                     (Some(Base64JsonDecodable(data)), None) => SavedAttachmentContent::Bytes(data),
@@ -256,12 +256,12 @@ impl serde::Deserialize for SavedAttachment {
 
                 let ContentTypeJsonDecodable(content_type) = match content_type {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("content_type")),
+                    None => visitor.missing_field("content_type")?,
                 };
 
                 let digest = match digest {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("digest")),
+                    None => visitor.missing_field("digest")?,
                 };
 
                 let encoding_info = match (encoded_length, encoding) {
@@ -284,7 +284,7 @@ impl serde::Deserialize for SavedAttachment {
 
                 let sequence_number = match revpos {
                     Some(x) => x,
-                    None => try!(visitor.missing_field("revpos")),
+                    None => visitor.missing_field("revpos")?,
                 };
 
                 Ok(SavedAttachment {
@@ -324,17 +324,17 @@ impl serde::Serialize for UnsavedAttachment {
         S: serde::Serializer,
     {
         let content_type = self.content_type.clone();
-        let mut state = try!(serializer.serialize_struct("UnsavedAttachment", 2));
-        try!(serializer.serialize_struct_elt(
+        let mut state = serializer.serialize_struct("UnsavedAttachment", 2)?;
+        serializer.serialize_struct_elt(
             &mut state,
             "content_type",
             &content_type,
-        ));
-        try!(serializer.serialize_struct_elt(
+        )?;
+        serializer.serialize_struct_elt(
             &mut state,
             "data",
             &Base64JsonEncodable(&self.content),
-        ));
+        )?;
         serializer.serialize_struct_end(state)
     }
 }
@@ -356,10 +356,9 @@ impl serde::Deserialize for Base64JsonDecodable {
             where
                 E: serde::de::Error,
             {
-                use std::error::Error;
-                let blob = try!(base64::decode(value).map_err(
-                    |e| E::invalid_value(e.description()),
-                ));
+                let blob = base64::decode(value).map_err(
+                    |e| E::invalid_value(&e.to_string()),
+                )?;
                 Ok(Base64JsonDecodable(blob))
             }
         }
@@ -398,7 +397,7 @@ impl serde::Deserialize for ContentTypeJsonDecodable {
             where
                 E: serde::de::Error,
             {
-                let m = try!(v.parse().map_err(|_| E::invalid_value("Bad MIME string")));
+                let m = v.parse().map_err(|_| E::invalid_value("Bad MIME string"))?;
                 Ok(ContentTypeJsonDecodable(m))
             }
         }

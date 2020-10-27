@@ -3,5 +3,5 @@
 mod fake_server;
 
 pub use self::fake_server::FakeServer;
-pub use document::DocumentBuilder;
-pub use view::{IsGrouped, IsReduced, IsUnreduced, ViewResponseBuilder};
+pub use crate::document::DocumentBuilder;
+pub use crate::view::{IsGrouped, IsReduced, IsUnreduced, ViewResponseBuilder};

@@ -1,5 +1,5 @@
 extern crate base64;
-extern crate chill;
+
 #[macro_use]
 extern crate mime;
 extern crate serde_json;
