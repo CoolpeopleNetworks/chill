@@ -110,9 +110,7 @@ impl Error {
             Err(x) => x,
         }
     }
-}
 
-impl std::error::Error for Error {
     fn description(&self) -> &str {
         use Error::*;
         match self {
@@ -143,7 +141,9 @@ impl std::error::Error for Error {
             &UrlParse { .. } => "The URL is badly formatted",
         }
     }
+}
 
+impl std::error::Error for Error {
     fn cause(&self) -> Option<&dyn std::error::Error> {
         use Error::*;
         match self {
@@ -172,7 +172,7 @@ impl std::error::Error for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
         use Error::*;
-        let description = self.to_string();
+        let description = self.description();
         match self {
             &ChannelReceive {
                 ref cause,
