@@ -9,6 +9,7 @@ use {hyper, serde, serde_json, std};
 use super::error::TransportErrorKind;
 pub use hyper::method::Method;
 pub use hyper::status::StatusCode;
+use hyper::header::{Headers, Authorization};
 use std::io::prelude::*;
 
 pub trait AsQueryKey {
@@ -328,9 +329,26 @@ impl Transport for HyperTransport {
         H: ResponseHandler<T>,
     {
         let mut response = {
-            let requester = self.hyper_client
+            let mut authorization: String = "".to_string();
+            if request.url.has_authority() {
+                if request.url.password().is_some() {
+                    authorization = format!("{}:{}", request.url.username(), request.url.password().unwrap());
+                } else {
+                    authorization = format!("{}", request.url.username());
+                }
+
+                authorization = format!("Basic {}", base64::encode(authorization));   
+            }
+
+            let mut requester = self.hyper_client
                 .request(request.method, request.url)
                 .headers(request.headers);
+
+            if authorization.is_empty() == false {
+                let mut auth_headers = Headers::new();
+                auth_headers.set(Authorization(authorization.to_owned()));
+                requester = requester.headers(auth_headers);
+            }
 
             let requester = if request.body.is_empty() {
                 requester
